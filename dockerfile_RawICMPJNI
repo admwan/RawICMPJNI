@@ -1,0 +1,13 @@
+FROM openjdk:23-jdk-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the JAR file into the container
+COPY RawICMPJNI.jar /app/RawICMPJNI.jar
+
+# Copy the native library into the container
+COPY libicmp_native.so /app/libicmp_native.so
+
+# Set the entry point
+ENTRYPOINT ["java", "-Djava.library.path=/app", "-jar", "/app/RawICMPJNI.jar", "RawICMPJNI"]

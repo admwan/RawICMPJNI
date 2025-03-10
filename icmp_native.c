@@ -1,0 +1,97 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <jni.h>
+#include <sys/socket.h>
+#include <netinet/ip_icmp.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <errno.h>
+
+// Compute checksum for ICMP packet
+unsigned short checksum(void *b, int len) {
+    unsigned short *buf = b;
+    unsigned int sum = 0;
+    unsigned short result;
+
+    for (sum = 0; len > 1; len -= 2)
+        sum += *buf++;
+    if (len == 1)
+        sum += *(unsigned char *)buf;
+
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+    result = ~sum;
+    return result;
+}
+
+// JNI Method to send an ICMP Echo Request
+JNIEXPORT jboolean JNICALL Java_net_spikesync_pingerdaemonrabbitmqclient_RawICMPJNI_sendICMPPing(JNIEnv *env, jobject obj, jstring ipAddress) {
+    const char *target_ip = (*env)->GetStringUTFChars(env, ipAddress, 0);
+    int sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+
+    if (sockfd < 0) {
+        perror("Socket creation failed");
+        (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
+        return JNI_FALSE;
+    }
+
+    // Set receive timeout (1 second)
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("Failed to set socket timeout");
+        close(sockfd);
+        (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
+        return JNI_FALSE;
+    }
+
+    struct sockaddr_in dest;
+    memset(&dest, 0, sizeof(dest));
+    dest.sin_family = AF_INET;
+    if (inet_pton(AF_INET, target_ip, &dest.sin_addr) <= 0) {
+        perror("Invalid IP address");
+        close(sockfd);
+        (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
+        return JNI_FALSE;
+    }
+
+    struct icmp icmp_packet;
+    memset(&icmp_packet, 0, sizeof(icmp_packet));
+    icmp_packet.icmp_type = ICMP_ECHO;
+    icmp_packet.icmp_code = 0;
+    icmp_packet.icmp_id = getpid();
+    icmp_packet.icmp_seq = 1;
+    icmp_packet.icmp_cksum = checksum(&icmp_packet, sizeof(icmp_packet));
+
+    ssize_t sent_bytes = sendto(sockfd, &icmp_packet, sizeof(icmp_packet), 0, (struct sockaddr *)&dest, sizeof(dest));
+    if (sent_bytes <= 0) {
+        perror("ICMP send failed");
+        close(sockfd);
+        (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
+        return JNI_FALSE;
+    }
+
+    // Prepare for receiving the response
+    char recv_buffer[1024];
+    struct sockaddr_in recv_addr;
+    socklen_t addr_len = sizeof(recv_addr);
+
+    ssize_t recv_bytes = recvfrom(sockfd, recv_buffer, sizeof(recv_buffer), 0, (struct sockaddr *)&recv_addr, &addr_len);
+    if (recv_bytes <= 0) {
+        if (errno == EWOULDBLOCK || errno == EAGAIN) {
+            fprintf(stderr, "ICMP receive timed out\n");
+        } else {
+            perror("ICMP receive failed");
+        }
+        close(sockfd);
+        (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
+        return JNI_FALSE;
+    }
+
+    close(sockfd);
+    (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
+    return JNI_TRUE;
+}

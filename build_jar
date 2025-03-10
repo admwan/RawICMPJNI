@@ -1,0 +1,1 @@
+jar cfm RawICMPJNI.jar RawICMPJNI.txt net/spikesync/pingerdaemonrabbitmqclient/RawICMPJNI.class
