@@ -31,8 +31,13 @@ JNIEXPORT jboolean JNICALL Java_net_spikesync_pingerdaemonrabbitmqclient_RawICMP
     const char *target_ip = (*env)->GetStringUTFChars(env, ipAddress, 0);
     int sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 
+ 	    fprintf(stderr, "Running funciton Java_net_spikesync_pingerdaemonrabbitmqclient_RawICMPJNI_sendICMPPing\n");
+
+
     if (sockfd < 0) {
         perror("Socket creation failed");
+  	    fprintf(stderr, "Socket creation failed\n");
+
         (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
         return JNI_FALSE;
     }
@@ -43,6 +48,8 @@ JNIEXPORT jboolean JNICALL Java_net_spikesync_pingerdaemonrabbitmqclient_RawICMP
     timeout.tv_usec = 0;
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("Failed to set socket timeout");
+ 	    fprintf(stderr, "Failed to set socket timeout\n");
+        
         close(sockfd);
         (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
         return JNI_FALSE;
@@ -69,6 +76,8 @@ JNIEXPORT jboolean JNICALL Java_net_spikesync_pingerdaemonrabbitmqclient_RawICMP
     ssize_t sent_bytes = sendto(sockfd, &icmp_packet, sizeof(icmp_packet), 0, (struct sockaddr *)&dest, sizeof(dest));
     if (sent_bytes <= 0) {
         perror("ICMP send failed");
+ 	    fprintf(stderr, "ICMP send failed\n");
+ 
         close(sockfd);
         (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
         return JNI_FALSE;
@@ -84,7 +93,8 @@ JNIEXPORT jboolean JNICALL Java_net_spikesync_pingerdaemonrabbitmqclient_RawICMP
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             fprintf(stderr, "ICMP receive timed out\n");
         } else {
-            perror("ICMP receive failed");
+	 	    fprintf(stderr, "ICMP send failed\n");		
+            perror("ICMP send failed");
         }
         close(sockfd);
         (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
@@ -92,6 +102,7 @@ JNIEXPORT jboolean JNICALL Java_net_spikesync_pingerdaemonrabbitmqclient_RawICMP
     }
 
     close(sockfd);
+    fprintf(stderr, "ICMP send bytes succeeded!\n");
     (*env)->ReleaseStringUTFChars(env, ipAddress, target_ip);
     return JNI_TRUE;
 }

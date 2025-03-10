@@ -10,7 +10,7 @@ public class RawICMPJNI {
 
     public static void main(String[] args) {
         net.spikesync.pingerdaemonrabbitmqclient.RawICMPJNI ping = new net.spikesync.pingerdaemonrabbitmqclient.RawICMPJNI();
-        String target = "192.168.50.234"; // Replace with your container IP
+        String target = "192.168.50.233"; // Replace with your container IP
 
         if (ping.sendICMPPing(target)) {
             System.out.println(target + " is reachable via ICMP.");
